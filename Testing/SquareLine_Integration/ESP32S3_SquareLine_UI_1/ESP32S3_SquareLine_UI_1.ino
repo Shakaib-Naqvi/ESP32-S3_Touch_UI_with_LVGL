@@ -1,6 +1,26 @@
 /*Using LVGL with Arduino requires some extra steps:
  *Be sure to read the docs here: https://docs.lvgl.io/master/get-started/platforms/arduino.html  */
 
+
+
+
+// #define RELAY1_PIN 25  // Relay 1 GPIO
+// #define RELAY2_PIN 26  // Relay 2 GPIO
+
+
+// bool relay1_state = false;  // Track relay state
+// bool relay2_state = false;
+
+#define VALVE_DOWN_SWITCH 33  // Manual switch (input) - LOW active
+#define VALVE_DOWN_RELAY 21   // Relay for Valve Down - HIGH active
+#define VALVE_UP_RELAY 18     // Relay for Valve Up - HIGH active
+#define PRESSURE_SENSOR 17    // Analog input from pressure sensor
+#define VALVE_UP_LOCK 16      // Lock valve if max pressure reached - HIGH active
+#define VALVE_UP_SWITCH 15    // Manual switch (input) - LOW active
+
+
+
+
 #include <lvgl.h>
 #include <TFT_eSPI.h>
 #include "lv_conf.h"
@@ -10,219 +30,253 @@
 #include <esp_system.h>  // CPU-Frequenzeinstellungen
 
 
-
-#define RELAY1_PIN 25  // Relay 1 GPIO
-#define RELAY2_PIN 26  // Relay 2 GPIO
-
-bool relay1_state = false;  // Track relay state
-bool relay2_state = false;  
-
-#define VALVE_DOWN_SWITCH  33  // Manual switch (input) - LOW active
-#define VALVE_DOWN_RELAY   21  // Relay for Valve Down - HIGH active
-#define VALVE_UP_RELAY     18  // Relay for Valve Up - HIGH active
-#define PRESSURE_SENSOR    17  // Analog input from pressure sensor
-#define VALVE_UP_LOCK      16  // Lock valve if max pressure reached - HIGH active
-#define VALVE_UP_SWITCH    15  // Manual switch (input) - LOW active
-
-
+// bool relay1_state = false;
 
 /*To use the built-in examples and demos of LVGL uncomment the includes below respectively.
  *You also need to copy `lvgl/examples` to `lvgl/src/examples`. Similarly for the demos `lvgl/demos` to `lvgl/src/demos`.
  Note that the `lv_examples` library is for LVGL v7 and you shouldn't install it for this version (since LVGL v8)
  as the examples and demos are now part of the main LVGL library. */
 
-#define EXAMPLE_LVGL_TICK_PERIOD_MS    2
+#define EXAMPLE_LVGL_TICK_PERIOD_MS 2
 
 /*Change to your screen resolution*/
-static const uint16_t screenWidth  = 240;
+static const uint16_t screenWidth = 240;
 static const uint16_t screenHeight = 240;
 
 static lv_disp_draw_buf_t draw_buf;
-static lv_color_t buf[ screenWidth * screenHeight / 10 ];
+static lv_color_t buf[screenWidth * screenHeight / 10];
 
 TFT_eSPI tft = TFT_eSPI(screenWidth, screenHeight); /* TFT instance */
-CST816S touch(6, 7, 13, 5);	// sda, scl, rst, irq
+CST816S touch(6, 7, 13, 5);                         // sda, scl, rst, irq
 
 #if LV_USE_LOG != 0
 /* Serial debugging */
-void my_print(const char * buf)
-{
-    Serial.printf(buf);
-    Serial.flush();
+void my_print(const char *buf) {
+  Serial.printf(buf);
+  Serial.flush();
 }
 #endif
 
 /* Display flushing */
-void my_disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p )
-{
-    uint32_t w = ( area->x2 - area->x1 + 1 );
-    uint32_t h = ( area->y2 - area->y1 + 1 );
+void my_disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p) {
+  uint32_t w = (area->x2 - area->x1 + 1);
+  uint32_t h = (area->y2 - area->y1 + 1);
 
-    tft.startWrite();
-    tft.setAddrWindow( area->x1, area->y1, w, h );
-    tft.pushColors( ( uint16_t * )&color_p->full, w * h, true );
-    tft.endWrite();
+  tft.startWrite();
+  tft.setAddrWindow(area->x1, area->y1, w, h);
+  tft.pushColors((uint16_t *)&color_p->full, w * h, true);
+  tft.endWrite();
 
-    lv_disp_flush_ready( disp_drv );
+  lv_disp_flush_ready(disp_drv);
 }
 
-void example_increase_lvgl_tick(void *arg)
-{
-    /* Tell LVGL how many milliseconds has elapsed */
-    lv_tick_inc(EXAMPLE_LVGL_TICK_PERIOD_MS);
+void example_increase_lvgl_tick(void *arg) {
+  /* Tell LVGL how many milliseconds has elapsed */
+  lv_tick_inc(EXAMPLE_LVGL_TICK_PERIOD_MS);
 }
 
-static uint8_t count=0;
-void example_increase_reboot(void *arg)
-{
+static uint8_t count = 0;
+void example_increase_reboot(void *arg) {
   count++;
-  if(count==30){
+  if (count == 30) {
     // esp_restart();
   }
-    
 }
 
 /*Read the touchpad*/
-void my_touchpad_read( lv_indev_drv_t * indev_drv, lv_indev_data_t * data )
-{
-    // uint16_t touchX, touchY;
+void my_touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data) {
+  // uint16_t touchX, touchY;
 
-    bool touched = touch.available();
-    // touch.read_touch();
-    if( !touched )
-    // if( 0!=touch.data.points )
-    {
-        data->state = LV_INDEV_STATE_REL;
-    }
-    else
-    {
-        data->state = LV_INDEV_STATE_PR;
+  bool touched = touch.available();
+  // touch.read_touch();
+  if (!touched)
+  // if( 0!=touch.data.points )
+  {
+    data->state = LV_INDEV_STATE_REL;
+  } else {
+    data->state = LV_INDEV_STATE_PR;
 
-        /*Set the coordinates*/
-        data->point.x = touch.data.x;
-        data->point.y = touch.data.y;
-        // Serial.print( "Data x " );
-        // Serial.println( touch.data.x );
+    /*Set the coordinates*/
+    data->point.x = touch.data.x;
+    data->point.y = touch.data.y;
+    // Serial.print( "Data x " );
+    // Serial.println( touch.data.x );
 
-        // Serial.print( "Data y " );
-        // Serial.println( touch.data.y );
-    }
+    // Serial.print( "Data y " );
+    // Serial.println( touch.data.y );
+  }
 }
 
 
 // Function to toggle Relay 1
-void relay1_toggle(lv_event_t * e) {
-    relay1_state = !relay1_state;  // Toggle state
-    digitalWrite(RELAY1_PIN, relay1_state ? HIGH : LOW);
-    if(relay1_state){
-    Serial.println("Relay 1 ON!!!!");
-    }
-    else{
-    Serial.println("---------------Relay 1 OFF------------");
-    }
-    lv_label_set_text(ui_LabelRelay1, relay1_state ? "Relay 1: ON" : "Relay 1: OFF");
-}
+// void relay1_toggle(lv_event_t * e) {
+//     relay1_state = !relay1_state;  // Toggle state
+//     digitalWrite(RELAY1_PIN, relay1_state ? HIGH : LOW);
+//     if(relay1_state){
+//     Serial.println("Relay 1 ON!!!!");
+//     }
+//     else{
+//     Serial.println("---------------Relay 1 OFF------------");
+//     }
+//     lv_label_set_text(ui_LabelRelay1, relay1_state ? "Relay 1: ON" : "Relay 1: OFF");
+// }
 
-// Function to toggle Relay 2
-void relay2_toggle(lv_event_t * e) {
-    relay2_state = !relay2_state;  
-    digitalWrite(RELAY2_PIN, relay2_state ? HIGH : LOW);
-    lv_label_set_text(ui_LabelRelay2, relay2_state ? "Relay 2: ON" : "Relay 2: OFF");
-}
+// // Function to toggle Relay 2
+// void relay2_toggle(lv_event_t * e) {
+//     relay2_state = !relay2_state;
+//     digitalWrite(RELAY2_PIN, relay2_state ? HIGH : LOW);
+//     lv_label_set_text(ui_LabelRelay2, relay2_state ? "Relay 2: ON" : "Relay 2: OFF");
+// }
 
 
 
-void setup()
-{
-    Serial.begin( 115200 ); /* prepare for possible serial debug */
+void setup() {
+  Serial.begin(115200); /* prepare for possible serial debug */
 
-    String LVGL_Arduino = "Hello Arduino! ";
-    LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
+  String LVGL_Arduino = "Hello Arduino! ";
+  LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
 
-    Serial.println( LVGL_Arduino );
-    Serial.println( "I am LVGL_Arduino" );
+  Serial.println(LVGL_Arduino);
+  Serial.println("I am LVGL_Arduino");
 
-    lv_init();
+  lv_init();
 #if LV_USE_LOG != 0
-    lv_log_register_print_cb( my_print ); /* register print function for debugging */
+  lv_log_register_print_cb(my_print); /* register print function for debugging */
 #endif
 
-    tft.begin();          /* TFT init */
-    tft.setRotation( 0 ); /* Landscape orientation, flipped */
-    
-    /*Set the touchscreen calibration data,
+  tft.begin();        /* TFT init */
+  tft.setRotation(0); /* Landscape orientation, flipped */
+
+  /*Set the touchscreen calibration data,
      the actual data for your display can be acquired using
      the Generic -> Touch_calibrate example from the TFT_eSPI library*/
-    // uint16_t calData[5] = { 275, 3620, 264, 3532, 1 };
-    // tft.setTouch( calData );
-    touch.begin();
+  // uint16_t calData[5] = { 275, 3620, 264, 3532, 1 };
+  // tft.setTouch( calData );
+  touch.begin();
 
-    lv_disp_draw_buf_init( &draw_buf, buf, NULL, screenWidth * screenHeight / 10 );
+  lv_disp_draw_buf_init(&draw_buf, buf, NULL, screenWidth * screenHeight / 10);
 
-    /*Initialize the display*/
-    static lv_disp_drv_t disp_drv;
-    lv_disp_drv_init( &disp_drv );
-    /*Change the following line to your display resolution*/
-    disp_drv.hor_res = screenWidth;
-    disp_drv.ver_res = screenHeight;
-    disp_drv.flush_cb = my_disp_flush;
-    disp_drv.draw_buf = &draw_buf;
-    lv_disp_drv_register( &disp_drv );
+  /*Initialize the display*/
+  static lv_disp_drv_t disp_drv;
+  lv_disp_drv_init(&disp_drv);
+  /*Change the following line to your display resolution*/
+  disp_drv.hor_res = screenWidth;
+  disp_drv.ver_res = screenHeight;
+  disp_drv.flush_cb = my_disp_flush;
+  disp_drv.draw_buf = &draw_buf;
+  lv_disp_drv_register(&disp_drv);
 
-    /*Initialize the (dummy) input device driver*/
-    static lv_indev_drv_t indev_drv;
-    lv_indev_drv_init( &indev_drv );
-    indev_drv.type = LV_INDEV_TYPE_POINTER;
-    indev_drv.read_cb = my_touchpad_read;
-    lv_indev_drv_register( &indev_drv );
-  
-    /* Create simple label */
-    lv_obj_t *label = lv_label_create( lv_scr_act() );
-    lv_label_set_text( label, "Hello Arduino and LVGL!");
-    lv_obj_align( label, LV_ALIGN_CENTER, 0, 0 );
- 
-    /* Try an example. See all the examples 
+  /*Initialize the (dummy) input device driver*/
+  static lv_indev_drv_t indev_drv;
+  lv_indev_drv_init(&indev_drv);
+  indev_drv.type = LV_INDEV_TYPE_POINTER;
+  indev_drv.read_cb = my_touchpad_read;
+  lv_indev_drv_register(&indev_drv);
+
+  /* Create simple label */
+  lv_obj_t *label = lv_label_create(lv_scr_act());
+  lv_label_set_text(label, "Hello Arduino and LVGL!");
+  lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
+
+  /* Try an example. See all the examples 
      * online: https://docs.lvgl.io/master/examples.html
      * source codes: https://github.com/lvgl/lvgl/tree/e7f88efa5853128bf871dde335c0ca8da9eb7731/examples */
-     //lv_example_btn_1();
-   
-    const esp_timer_create_args_t lvgl_tick_timer_args = {
-      .callback = &example_increase_lvgl_tick,
-      .name = "lvgl_tick"
-    };
+  //lv_example_btn_1();
 
-    const esp_timer_create_args_t reboot_timer_args = {
-      .callback = &example_increase_reboot,
-      .name = "reboot"
-    };
+  const esp_timer_create_args_t lvgl_tick_timer_args = {
+    .callback = &example_increase_lvgl_tick,
+    .name = "lvgl_tick"
+  };
 
-    esp_timer_handle_t lvgl_tick_timer = NULL;
-    esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer);
-    esp_timer_start_periodic(lvgl_tick_timer, EXAMPLE_LVGL_TICK_PERIOD_MS * 1000);
+  const esp_timer_create_args_t reboot_timer_args = {
+    .callback = &example_increase_reboot,
+    .name = "reboot"
+  };
 
-    esp_timer_handle_t reboot_timer = NULL;
-    esp_timer_create(&reboot_timer_args, &reboot_timer);
-    esp_timer_start_periodic(reboot_timer, 2000 * 1000);
+  esp_timer_handle_t lvgl_tick_timer = NULL;
+  esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer);
+  esp_timer_start_periodic(lvgl_tick_timer, EXAMPLE_LVGL_TICK_PERIOD_MS * 1000);
 
-     /*Or try out a demo. Don't forget to enable the demos in lv_conf.h. E.g. LV_USE_DEMOS_WIDGETS*/
-    // lv_demo_widgets();               
-    // lv_demo_benchmark();          
-    // lv_demo_keypad_encoder();     
-    // lv_demo_music();              
-    // lv_demo_printer();
-    // lv_demo_stress();
-    
-    pinMode(RELAY1_PIN, OUTPUT);
-    pinMode(RELAY2_PIN, OUTPUT);
-    digitalWrite(RELAY1_PIN, LOW);
-    digitalWrite(RELAY2_PIN, LOW);
-    
-    Serial.println( "Setup done" );
-    ui_init();
+  esp_timer_handle_t reboot_timer = NULL;
+  esp_timer_create(&reboot_timer_args, &reboot_timer);
+  esp_timer_start_periodic(reboot_timer, 2000 * 1000);
+
+  /*Or try out a demo. Don't forget to enable the demos in lv_conf.h. E.g. LV_USE_DEMOS_WIDGETS*/
+  // lv_demo_widgets();
+  // lv_demo_benchmark();
+  // lv_demo_keypad_encoder();
+  // lv_demo_music();
+  // lv_demo_printer();
+  // lv_demo_stress();
+
+  // pinMode(RELAY1_PIN, OUTPUT);
+  // pinMode(RELAY2_PIN, OUTPUT);
+  // digitalWrite(RELAY1_PIN, LOW);
+  // digitalWrite(RELAY2_PIN, LOW);
+
+
+  // Configure input pins (switches & sensor)
+  pinMode(VALVE_DOWN_SWITCH, INPUT_PULLUP);
+  pinMode(VALVE_UP_SWITCH, INPUT_PULLUP);
+
+  // Configure output pins (relays & lock control)
+  pinMode(VALVE_DOWN_RELAY, OUTPUT);
+  pinMode(VALVE_UP_RELAY, OUTPUT);
+  pinMode(VALVE_UP_LOCK, OUTPUT);
+
+  // Set default relay states (off)
+  digitalWrite(VALVE_DOWN_RELAY, LOW);
+  digitalWrite(VALVE_UP_RELAY, LOW);
+  digitalWrite(VALVE_UP_LOCK, LOW);
+
+  Serial.println("Setup done");
+  ui_init();
 }
 
-void loop()
-{
-    lv_timer_handler(); /* let the GUI do its work */
-    delay( 5 );
+void loop() {
+  lv_timer_handler(); /* let the GUI do its work */
+  delay(5);
+
+if(relay_print){
+
+  if (relay1_state) {
+    Serial.println("Relay 1 ON!!!!");
+  } else {
+    Serial.println("---------------Relay 1 OFF------------");
+  }
+  relay_print = false;
 }
+}
+
+
+
+
+// int pressureValue = analogRead(PRESSURE_SENSOR);
+// float pressure = (pressureValue / 4095.0) * 3.3 * 10;  // Convert ADC to voltage & scale
+
+// // Check manual switch inputs
+// bool valveDownPressed = digitalRead(VALVE_DOWN_SWITCH) == LOW;
+// bool valveUpPressed = digitalRead(VALVE_UP_SWITCH) == LOW;
+
+// // Manual control (if switch is pressed)
+// if (valveDownPressed) {
+//     digitalWrite(VALVE_DOWN_RELAY, HIGH);  // Activate relay
+// } else {
+//     digitalWrite(VALVE_DOWN_RELAY, LOW);
+// }
+
+// if (valveUpPressed) {
+//     digitalWrite(VALVE_UP_RELAY, HIGH);
+// } else {
+//     digitalWrite(VALVE_UP_RELAY, LOW);
+// }
+
+// // Auto-lock Valve Up if pressure exceeds threshold
+// if (pressure >= 50.0) {  // Assume 50 PSI is the max limit
+//     digitalWrite(VALVE_UP_LOCK, HIGH);  // Lock the valve
+//     digitalWrite(VALVE_UP_RELAY, LOW);  // Ensure valve is off
+// } else {
+//     digitalWrite(VALVE_UP_LOCK, LOW);
+// }
+
+// Serial.print("Pressure: "); Serial.println(pressure);
