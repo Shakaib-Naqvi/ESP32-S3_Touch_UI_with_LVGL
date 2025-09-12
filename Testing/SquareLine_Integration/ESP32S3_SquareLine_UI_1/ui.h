@@ -16,6 +16,11 @@ extern "C" {
 #include "ui_events.h"
 
 
+
+extern bool relay1_state;  // Track relay state
+extern bool relay2_state;
+extern bool relay_print;  
+
 // SCREEN: ui_Screen1
 void ui_Screen1_screen_init(void);
 extern lv_obj_t * ui_Screen1;
@@ -23,6 +28,7 @@ extern lv_obj_t * ui_Screen1_Image1;
 extern lv_obj_t * ui_Screen1_Label1;
 extern lv_obj_t * ui_Screen1_Button1;
 extern lv_obj_t * ui_Screen1_Button2;
+void relay1_toggle(lv_event_t * e);
 void ui_event_Screen1_Container1(lv_event_t * e);
 extern lv_obj_t * ui_Screen1_Container1;
 // CUSTOM VARIABLES
