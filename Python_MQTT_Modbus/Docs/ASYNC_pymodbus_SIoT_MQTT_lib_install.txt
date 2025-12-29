@@ -1,0 +1,13 @@
+##=======================================================================
+## ASYNC PYTHON Lib Modbus RTU (install)
+## ====================================================================
+## A. Activate VirtualEVN PYTHON3: 
+##    source .venv/bin/activate
+## B. Install Python Lib in VENV (pymodbus ASYNC Modbus RTU + SIoT MQTT WebSErver Install):
+## 1. pip3 install pymodbus==3.9.2
+## 2. pip3 install siot                        
+## 3. pip3 install unihiker                    
+## 4. pip3 install secure-smtplib              
+## 5. pip3 install pinpong        
+##
+##========================================================================
